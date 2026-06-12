@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Claude API Demo — Tekravio</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0f0f0f;
+      color: #e8e8e8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      border-bottom: 1px solid #222;
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    header .logo {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: -0.3px;
+    }
+
+    header .tag {
+      font-size: 11px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 4px;
+      padding: 2px 8px;
+      color: #888;
+    }
+
+    .main {
+      display: flex;
+      flex: 1;
+      gap: 0;
+    }
+
+    .sidebar {
+      width: 220px;
+      border-right: 1px solid #1e1e1e;
+      padding: 24px 16px;
+      flex-shrink: 0;
+    }
+
+    .sidebar h3 {
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #555;
+      margin-bottom: 12px;
+    }
+
+    .mode-btn {
+      width: 100%;
+      text-align: left;
+      padding: 9px 12px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: #888;
+      font-size: 13px;
+      cursor: pointer;
+      margin-bottom: 2px;
+      transition: all 0.15s;
+    }
+
+    .mode-btn:hover { background: #1a1a1a; color: #ccc; }
+    .mode-btn.active { background: #1c2a1c; color: #6fcf6f; border: 1px solid #2a3e2a; }
+
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 28px 36px;
+      max-width: 900px;
+    }
+
+    .mode-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+
+    .mode-desc {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .model-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .model-row label {
+      font-size: 12px;
+      color: #666;
+    }
+
+    select {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      color: #ccc;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    textarea {
+      width: 100%;
+      background: #141414;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      color: #ddd;
+      font-family: 'Fira Code', 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 16px;
+      resize: vertical;
+      min-height: 200px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    textarea:focus { border-color: #3a3a3a; }
+    textarea::placeholder { color: #444; }
+
+    .run-btn {
+      margin-top: 14px;
+      padding: 10px 22px;
+      background: #1c3a1c;
+      border: 1px solid #2a5a2a;
+      color: #6fcf6f;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      align-self: flex-start;
+    }
+
+    .run-btn:hover:not(:disabled) { background: #224422; }
+    .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .output-box {
+      margin-top: 24px;
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 8px;
+      padding: 20px;
+      min-height: 120px;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #ccc;
+      white-space: pre-wrap;
+      display: none;
+    }
+
+    .output-box.visible { display: block; }
+
+    .output-box .meta {
+      font-size: 11px;
+      color: #555;
+      border-bottom: 1px solid #1e1e1e;
+      padding-bottom: 10px;
+      margin-bottom: 14px;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #444;
+      border-top-color: #6fcf6f;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error { color: #e07070; }
+
+    /* markdown-ish rendering */
+    .output-content h3 { color: #8ddb8d; font-size: 14px; margin: 14px 0 6px; }
+    .output-content code { background: #1e1e1e; padding: 1px 5px; border-radius: 3px; font-family: monospace; font-size: 12px; color: #b8d8b8; }
+    .output-content strong { color: #ddd; }
+
+    .api-note {
+      margin-top: 14px;
+      padding: 12px 16px;
+      background: #181818;
+      border: 1px solid #2a2a2a;
+      border-radius: 6px;
+      font-size: 11px;
+      color: #555;
+      line-height: 1.6;
+    }
+
+    .api-note code { color: #888; background: #222; padding: 1px 4px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">Claude API Demo</span>
+  <span class="tag">Tekravio Intern Assignment</span>
+  <span class="tag" style="margin-left:auto; color:#6fcf6f; border-color:#2a4a2a;">Live API</span>
+</header>
+
+<div class="main">
+  <div class="sidebar">
+    <h3>Mode</h3>
+    <button class="mode-btn active" onclick="setMode('review')">Code Reviewer</button>
+    <button class="mode-btn" onclick="setMode('summarise')">Doc Summariser</button>
+    <button class="mode-btn" onclick="setMode('chat')">Research Chat</button>
+  </div>
+
+  <div class="content">
+    <div class="mode-title" id="modeTitle">Code Reviewer</div>
+    <div class="mode-desc" id="modeDesc">Paste any code below. Claude will review it for bugs, style issues, and performance — with specific line references and fixes.</div>
+
+    <div class="model-row">
+      <label>Model:</label>
+      <select id="modelSelect">
+        <option value="claude-sonnet-4-6">claude-sonnet-4-6 (recommended)</option>
+        <option value="claude-haiku-4-5-20251001">claude-haiku-4-5 (fast)</option>
+      </select>
+    </div>
+
+    <textarea id="inputText" placeholder="Paste your code here..."></textarea>
+
+    <button class="run-btn" id="runBtn" onclick="run()">Run →</button>
+
+    <div class="output-box" id="outputBox">
+      <div class="meta" id="outputMeta"></div>
+      <div class="output-content" id="outputContent"></div>
+    </div>
+
+    <div class="api-note">
+      This demo calls the Anthropic API directly from the browser using <code>fetch()</code> to <code>https://api.anthropic.com/v1/messages</code>. 
+      The API key is injected server-side — never exposed in client JS. Source in <code>server.js</code>.
+      Switching models shows the real speed/quality tradeoff between Sonnet and Haiku.
+    </div>
+  </div>
+</div>
+
+<script>
+  const modes = {
+    review: {
+      title: 'Code Reviewer',
+      desc: 'Paste any code below. Claude will review it for bugs, style issues, and performance — with specific line references and fixes.',
+      placeholder: 'Paste your code here...',
+      system: `You are a senior software engineer doing a code review. Be direct and specific.
+Structure your response exactly like this:
+
+## BUGS
+List any correctness issues with line numbers. If none, say "None found."
+
+## STYLE
+List style/readability issues. Be specific about what and why.
+
+## PERFORMANCE
+List performance concerns. Note complexity where relevant.
+
+## VERDICT
+One sentence: overall quality and top priority fix.
+
+Use code snippets to show fixes. Be honest — don't pad the review.`,
+      userPrefix: 'Review this code:\n\n'
+    },
+    summarise: {
+      title: 'Document Summariser',
+      desc: 'Paste any document, article, or text. Claude will produce a structured summary with key points and a one-line takeaway.',
+      placeholder: 'Paste your document or article here...',
+      system: `You are a research analyst. Summarise the provided text concisely and accurately.
+Structure your response like this:
+
+## SUMMARY
+2-3 sentences capturing the core content.
+
+## KEY POINTS
+3-5 specific points (not generic — use the actual content).
+
+## TAKEAWAY
+One sentence: what someone should do with this information.
+
+Don't add filler. Every word should earn its place.`,
+      userPrefix: 'Summarise this:\n\n'
+    },
+    chat: {
+      title: 'Research Chat',
+      desc: 'Ask Claude anything about AI, models, benchmarks, or Anthropic. This mode uses the full context window — try a detailed question.',
+      placeholder: 'Ask a question about Claude, AI benchmarks, Anthropic\'s approach, model selection...',
+      system: `You are an AI research analyst at Tekravio, a technology consulting company.
+You have deep knowledge of Claude, Anthropic, LLM benchmarks, and enterprise AI deployment.
+Be direct. Be specific. Acknowledge uncertainty when it exists.
+If something is contested or depends on context, say so rather than giving a false confident answer.`,
+      userPrefix: ''
+    }
+  };
+
+  let currentMode = 'review';
+
+  function setMode(mode) {
+    currentMode = mode;
+    const m = modes[mode];
+    document.getElementById('modeTitle').textContent = m.title;
+    document.getElementById('modeDesc').textContent = m.desc;
+    document.getElementById('inputText').placeholder = m.placeholder;
+    document.getElementById('inputText').value = '';
+    document.getElementById('outputBox').classList.remove('visible');
+    document.querySelectorAll('.mode-btn').forEach((b, i) => {
+      b.classList.toggle('active', ['review','summarise','chat'][i] === mode);
+    });
+  }
+
+  function renderMarkdown(text) {
+    return text
+      .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\n/g, '<br>');
+  }
+
+  async function run() {
+    const input = document.getElementById('inputText').value.trim();
+    if (!input) return;
+
+    const btn = document.getElementById('runBtn');
+    const box = document.getElementById('outputBox');
+    const meta = document.getElementById('outputMeta');
+    const content = document.getElementById('outputContent');
+    const model = document.getElementById('modelSelect').value;
+    const m = modes[currentMode];
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Running...';
+    box.classList.add('visible');
+    meta.textContent = '';
+    content.innerHTML = '<span class="spinner"></span> Waiting for Claude...';
+
+    const t0 = Date.now();
+
+    try {
+      const res = await fetch('/api/claude', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          system: m.system,
+          user: m.userPrefix + input
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        content.innerHTML = `<span class="error">Error: ${data.error || 'API call failed'}</span>`;
+        return;
+      }
+
+      const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+      const tokens = data.usage ? `${data.usage.input_tokens} in / ${data.usage.output_tokens} out` : '';
+      meta.textContent = `${model} · ${elapsed}s · ${tokens}`;
+      content.innerHTML = renderMarkdown(data.content[0].text);
+
+    } catch (e) {
+      content.innerHTML = `<span class="error">Network error: ${e.message}</span>`;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = 'Run →';
+    }
+  }
+</script>
+</body>
+</html>
